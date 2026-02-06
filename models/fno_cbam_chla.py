@@ -244,9 +244,6 @@ class FNO_CBAM_Chla(nn.Module):
         return pred
 
 
-# 保持向后兼容的别名
-FNO_CBAM_SST_Temporal = FNO_CBAM_Chla
-
 
 def count_parameters(model):
     """统计模型参数量"""
