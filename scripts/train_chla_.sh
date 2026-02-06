@@ -9,13 +9,14 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # 配置
 DATA_DIR="/data_new/chla_data_imputation_data_260125/chla_data_pretraining/filled_target_modified"
+SST_DIR="/data_new/chla_data_imputation_data_260125/chla_data_pretraining/sst_daily_fusion_target"
 OUTPUT_DIR="${PROJECT_ROOT}/checkpoints/chla_target_train"
 RESUME_CKPT=""
 NUM_GPUS=8
 
 # 训练参数
 EPOCHS=100
-BATCH_SIZE=8  # per GPU
+BATCH_SIZE=16  # per GPU
 LR=2e-4
 MASK_RATIO=0.25
 
@@ -45,8 +46,9 @@ cd "${PROJECT_ROOT}"
 
 torchrun --nproc_per_node=${NUM_GPUS} \
     --master_port=29501 \
-    training/train_chla_finetune.py \
+    training/train_chla.py \
     --data_dir ${DATA_DIR} \
+    --sst_dir ${SST_DIR} \
     --output_dir ${OUTPUT_DIR} \
     ${RESUME_CKPT:+--resume ${RESUME_CKPT}} \
     --years_train ${TRAIN_YEARS} \
@@ -58,7 +60,6 @@ torchrun --nproc_per_node=${NUM_GPUS} \
     --use_amp \
     --resample_by_missing \
     --resample_gamma 1.5 \
-    --lambda_base 0.02 \
     --num_workers 8 \
     --log_interval 20 \
     --save_interval 10

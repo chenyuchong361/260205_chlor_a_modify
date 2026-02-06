@@ -15,26 +15,14 @@ import torch.nn as nn
 class ChlaReconstructionLoss(nn.Module):
     """叶绿素重建损失（Masked MAE）"""
 
-    def __init__(
-        self,
-        lambda_base: float = 0.0,
-        use_mae: bool = True,
-        min_supervised_pixels: int = 0,
-        low_supervision_weight: float = 1.0,
-    ):
+    def __init__(self):
         super().__init__()
-        self.lambda_base = float(lambda_base)
-        self.use_mae = bool(use_mae)
-        self.min_supervised_pixels = int(min_supervised_pixels)
-        self.low_supervision_weight = float(low_supervision_weight)
 
     def forward(
         self,
         pred: torch.Tensor,
         target: torch.Tensor,
         artificial_mask: torch.Tensor,
-        missing_mask: torch.Tensor,
-        baseline: torch.Tensor = None,
     ) -> dict:
         # 兼容 [B, 1, H, W]
         if pred.dim() == 4:
@@ -47,18 +35,12 @@ class ChlaReconstructionLoss(nn.Module):
         num_recon_pixels = recon_mask.sum()
 
         if num_recon_pixels > 0:
-            recon_loss = (torch.abs(pred - target) * recon_mask).sum() / (num_recon_pixels + eps)
+            loss = (torch.abs(pred - target) * recon_mask).sum() / (num_recon_pixels + eps)
         else:
-            recon_loss = torch.tensor(0.0, device=pred.device)
-
-        # 保持训练脚本兼容：依然返回 base_loss，但不参与训练
-        base_loss = torch.tensor(0.0, device=pred.device)
-        total_loss = recon_loss
+            loss = torch.tensor(0.0, device=pred.device)
 
         return {
-            'loss': total_loss,
-            'recon_loss': recon_loss,
-            'base_loss': base_loss,
+            'loss': loss,
             'num_recon_pixels': num_recon_pixels,
         }
 

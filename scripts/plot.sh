@@ -4,12 +4,18 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-python3 "${PROJECT_ROOT}/visualization/plot_chla_4panel.py" \
-    --region 1 \
-    --date 20241001 \
+# Activate environment
+source ~/miniconda3/etc/profile.d/conda.sh
+conda activate agent
+
+python3 "${PROJECT_ROOT}/visualization/plot_simple_4panel.py" \
+    --date 20201001 \
+    --data-dir "/data_new/chla_data_imputation_data_260125/chla_data_pretraining/filled_target_modified" \
+    --sst-dir "/data_new/chla_data_imputation_data_260125/chla_data_pretraining/sst_daily_fusion_target" \
+    --model "${PROJECT_ROOT}/checkpoints/chla_target_train/best_model.pth" \
+    --output "${PROJECT_ROOT}/visualization/output/chla_plot/" \
     --mask-ratio 0.2 \
     --seed 42 \
-    --output "${PROJECT_ROOT}/visualization/output/chla_plot/" \
-    --model "${PROJECT_ROOT}/checkpoints/chla_target_train/best_model.pth" \
-    --cropped-data-dir /data_new/chla_data_imputation_data_260125/chla_data_pretraining/cropped_regions/ \
     --gpu 0
+
+echo "Plot saved to: ${PROJECT_ROOT}/visualization/output/chla_plot/chla_4panel_20200101.png"

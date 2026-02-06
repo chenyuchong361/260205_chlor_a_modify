@@ -15,6 +15,7 @@ import os
 import sys
 import argparse
 from pathlib import Path
+from datetime import datetime
 
 import numpy as np
 import torch
@@ -31,6 +32,25 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from models.fno_cbam_chla import FNO_CBAM_Chla
 from datasets.chla_dataset import ChlaFinetuneDataset
 from losses.chla_loss import ChlaReconstructionLoss
+
+
+class Logger:
+    """双向日志记录器：同时输出到控制台和文件"""
+    def __init__(self, log_file):
+        self.terminal = sys.stdout
+        self.log = open(log_file, 'w', encoding='utf-8')
+
+    def write(self, message):
+        self.terminal.write(message)
+        self.log.write(message)
+        self.flush()
+
+    def flush(self):
+        self.terminal.flush()
+        self.log.flush()
+
+    def close(self):
+        self.log.close()
 
 
 def setup_distributed():
@@ -74,16 +94,12 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scaler, device, epo
     model.train()
 
     total_loss = 0.0
-    total_recon_loss = 0.0
-    total_base_loss = 0.0
     num_batches = 0
 
     for batch_idx, batch in enumerate(dataloader):
         inputs = batch['input'].to(device)
         target = batch['target'].to(device)
         artificial_mask = batch['artificial_mask'].to(device)
-        missing_mask = batch['missing_mask'].to(device)
-        baseline = inputs[:, 29, :, :]
 
         optimizer.zero_grad()
 
@@ -93,8 +109,6 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scaler, device, epo
                 pred=pred,
                 target=target,
                 artificial_mask=artificial_mask,
-                missing_mask=missing_mask,
-                baseline=baseline,
             )
             loss = loss_dict['loss']
 
@@ -110,19 +124,13 @@ def train_one_epoch(model, dataloader, criterion, optimizer, scaler, device, epo
             optimizer.step()
 
         total_loss += loss.item()
-        total_recon_loss += loss_dict['recon_loss'].item()
-        total_base_loss += loss_dict['base_loss'].item()
         num_batches += 1
 
         if rank == 0 and batch_idx % args.log_interval == 0:
-            print(f"  Batch {batch_idx}/{len(dataloader)}: "
-                  f"loss={loss.item():.4f}, "
-                  f"recon={loss_dict['recon_loss'].item():.4f}")
+            print(f"  Batch {batch_idx}/{len(dataloader)}: loss={loss.item():.4f}")
 
     return {
         'loss': total_loss / num_batches,
-        'recon_loss': total_recon_loss / num_batches,
-        'base_loss': total_base_loss / num_batches,
     }
 
 
@@ -131,7 +139,6 @@ def validate(model, dataloader, criterion, device, args):
     model.eval()
 
     total_loss = 0.0
-    total_recon_loss = 0.0
     num_batches = 0
 
     with torch.no_grad():
@@ -139,8 +146,6 @@ def validate(model, dataloader, criterion, device, args):
             inputs = batch['input'].to(device)
             target = batch['target'].to(device)
             artificial_mask = batch['artificial_mask'].to(device)
-            missing_mask = batch['missing_mask'].to(device)
-            baseline = inputs[:, 29, :, :]
 
             with autocast(enabled=args.use_amp):
                 pred = model(inputs)
@@ -148,17 +153,13 @@ def validate(model, dataloader, criterion, device, args):
                     pred=pred,
                     target=target,
                     artificial_mask=artificial_mask,
-                    missing_mask=missing_mask,
-                    baseline=baseline,
                 )
 
             total_loss += loss_dict['loss'].item()
-            total_recon_loss += loss_dict['recon_loss'].item()
             num_batches += 1
 
     return {
         'loss': total_loss / num_batches,
-        'recon_loss': total_recon_loss / num_batches,
     }
 
 
@@ -168,6 +169,8 @@ def main():
     # 数据参数
     parser.add_argument('--data_dir', type=str, required=True,
                        help='Target domain filled data directory')
+    parser.add_argument('--sst_dir', type=str, required=True,
+                       help='SST data directory')
     parser.add_argument('--output_dir', type=str, default='./checkpoints/finetune',
                        help='Output directory')
     parser.add_argument('--resume', type=str, default=None,
@@ -186,7 +189,7 @@ def main():
     parser.add_argument('--depth', type=int, default=6)
 
     # 训练参数
-    parser.add_argument('--epochs', type=int, default=100)
+    parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--lr', type=float, default=2e-4,
                        help='Learning rate')
@@ -195,9 +198,6 @@ def main():
     parser.add_argument('--use_amp', action='store_true')
 
     # 损失参数
-    parser.add_argument('--lambda_base', type=float, default=0.02)
-    parser.add_argument('--min_supervised_pixels', type=int, default=0)
-    parser.add_argument('--low_supervision_weight', type=float, default=1.0)
     parser.add_argument('--mask_ratio', type=float, default=0.25)
 
     # 采样参数
@@ -215,20 +215,29 @@ def main():
     rank, local_rank, world_size = setup_distributed()
     device = torch.device(f'cuda:{local_rank}')
 
+    # 创建输出目录和日志
     if rank == 0:
+        Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+
+        # 创建日志文件
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_file = Path(args.output_dir) / f"train_log_{timestamp}.txt"
+        logger = Logger(log_file)
+        sys.stdout = logger
+
         print("=" * 60)
         print("Chla FNO-CBAM Target Training")
         print("=" * 60)
+        print(f"Timestamp: {timestamp}")
+        print(f"Log file: {log_file}")
         print(f"World size: {world_size}")
         print(f"Data dir: {args.data_dir}")
+        print(f"SST dir: {args.sst_dir}")
         print(f"Resume checkpoint: {args.resume}")
         print(f"Output dir: {args.output_dir}")
         print(f"Learning rate: {args.lr}")
         print(f"Mask ratio: {args.mask_ratio}")
         print("=" * 60)
-
-    if rank == 0:
-        Path(args.output_dir).mkdir(parents=True, exist_ok=True)
 
     years_train = [int(y) for y in args.years_train.split(',')]
     years_val = [int(y) for y in args.years_val.split(',')]
@@ -236,6 +245,7 @@ def main():
     # 数据集
     train_dataset = ChlaFinetuneDataset(
         data_dir=args.data_dir,
+        sst_dir=args.sst_dir,
         years=years_train,
         window_size=30,
         mask_ratio=args.mask_ratio,
@@ -245,6 +255,7 @@ def main():
 
     val_dataset = ChlaFinetuneDataset(
         data_dir=args.data_dir,
+        sst_dir=args.sst_dir,
         years=years_val,
         window_size=30,
         mask_ratio=args.mask_ratio,
@@ -310,12 +321,7 @@ def main():
     if world_size > 1:
         model = DDP(model, device_ids=[local_rank])
 
-    criterion = ChlaReconstructionLoss(
-        lambda_base=args.lambda_base,
-        use_mae=True,
-        min_supervised_pixels=args.min_supervised_pixels,
-        low_supervision_weight=args.low_supervision_weight,
-    )
+    criterion = ChlaReconstructionLoss()
 
     optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
@@ -350,8 +356,8 @@ def main():
         scheduler.step()
 
         if rank == 0:
-            print(f"  Train - loss: {train_metrics['loss']:.4f}, recon: {train_metrics['recon_loss']:.4f}")
-            print(f"  Val   - loss: {val_metrics['loss']:.4f}, recon: {val_metrics['recon_loss']:.4f}")
+            print(f"  Train - loss: {train_metrics['loss']:.4f}")
+            print(f"  Val   - loss: {val_metrics['loss']:.4f}")
 
             if val_metrics['loss'] < best_val_loss:
                 best_val_loss = val_metrics['loss']
@@ -386,6 +392,11 @@ def main():
         print("Training completed!")
         print(f"Best validation loss: {best_val_loss:.4f}")
         print("=" * 60)
+
+        # 关闭日志
+        if hasattr(sys.stdout, 'close'):
+            sys.stdout.close()
+            sys.stdout = sys.__stdout__
 
 
 if __name__ == '__main__':

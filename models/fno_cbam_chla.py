@@ -109,15 +109,15 @@ class FeatureEngineering(nn.Module):
         """
         B, T, H, W = sst.shape
         # Reshape to apply 2D conv to each time step
-        sst_reshaped = sst.view(B * T, 1, H, W)
+        sst_reshaped = sst.reshape(B * T, 1, H, W)
 
         # Gradient
         grad_x = F.conv2d(sst_reshaped, self.sobel_x, padding=1)
         grad_y = F.conv2d(sst_reshaped, self.sobel_y, padding=1)
-        sst_grad = torch.sqrt(grad_x**2 + grad_y**2).view(B, T, H, W)
+        sst_grad = torch.sqrt(grad_x**2 + grad_y**2).reshape(B, T, H, W)
 
         # Laplacian
-        sst_lap = F.conv2d(sst_reshaped, self.laplacian, padding=1).view(B, T, H, W)
+        sst_lap = F.conv2d(sst_reshaped, self.laplacian, padding=1).reshape(B, T, H, W)
 
         # Anomaly: Subtract sliding window mean (temporal mean)
         # Represents deviation from the 30-day average state
