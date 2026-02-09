@@ -199,6 +199,12 @@ def main():
 
     # 损失参数
     parser.add_argument('--mask_ratio', type=float, default=0.25)
+    parser.add_argument('--smooth_label', action='store_true',
+                       help='Apply Gaussian smoothing to target labels before computing loss')
+    parser.add_argument('--smooth_kernel_size', type=int, default=5,
+                       help='Kernel size for Gaussian smoothing (must be odd)')
+    parser.add_argument('--smooth_sigma', type=float, default=1.0,
+                       help='Sigma for Gaussian smoothing')
 
     # 采样参数
     parser.add_argument('--resample_by_missing', action='store_true',
@@ -237,6 +243,10 @@ def main():
         print(f"Output dir: {args.output_dir}")
         print(f"Learning rate: {args.lr}")
         print(f"Mask ratio: {args.mask_ratio}")
+        print(f"Smooth label: {args.smooth_label}")
+        if args.smooth_label:
+            print(f"  Smooth kernel size: {args.smooth_kernel_size}")
+            print(f"  Smooth sigma: {args.smooth_sigma}")
         print("=" * 60)
 
     years_train = [int(y) for y in args.years_train.split(',')]
@@ -321,7 +331,11 @@ def main():
     if world_size > 1:
         model = DDP(model, device_ids=[local_rank])
 
-    criterion = ChlaReconstructionLoss()
+    criterion = ChlaReconstructionLoss(
+        smooth_label=args.smooth_label,
+        smooth_kernel_size=args.smooth_kernel_size,
+        smooth_sigma=args.smooth_sigma
+    )
 
     optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
