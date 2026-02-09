@@ -14,7 +14,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 PLOT_SCRIPT="${PROJECT_ROOT}/visualization/plot_training_curves.py"
 
 # 默认参数
-LOG_FILE="${1:-${PROJECT_ROOT}/train_log_fixed_20260206_071013.txt}"
+LOG_FILE="/home/cyc/260205_chlor_a_modify/checkpoints/chla_target_train/train_log_20260208_012158.txt"
 OUTPUT="${2:-}"
 SHOW_BATCH="${3:-false}"
 

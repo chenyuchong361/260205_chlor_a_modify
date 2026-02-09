@@ -93,6 +93,8 @@ def parse_training_log(log_file):
 def plot_training_curves(data, output_path, title='Training Curves', show_batch=False):
     """
     绘制训练曲线
+    - 验证集曲线改为实心圆点
+    - 纵坐标保持对数刻度
 
     Args:
         data: parse_training_log返回的数据字典
@@ -116,10 +118,16 @@ def plot_training_curves(data, output_path, title='Training Curves', show_batch=
 
     # 1. 训练和验证Loss曲线
     ax1 = axes[0] if not show_batch else axes[0, 0]
+    
+    # 训练集保持空心圆点 (便于区分)
     ax1.plot(epochs, train_losses, 'o-', label='Train Loss',
              color='#2E86AB', linewidth=2, markersize=6, markerfacecolor='white', markeredgewidth=2)
-    ax1.plot(epochs, val_losses, 's-', label='Val Loss',
-             color='#A23B72', linewidth=2, markersize=6, markerfacecolor='white', markeredgewidth=2)
+    
+    # --- 修改点：验证集改为实心圆点 ---
+    # 'o-' 表示圆形标记，移除了 markerfacecolor='white' 使其变为实心
+    ax1.plot(epochs, val_losses, 'o-', label='Val Loss',
+             color='#A23B72', linewidth=2, markersize=6)
+    # -------------------------------
 
     # 标记最优验证loss
     best_val_idx = np.argmin(val_losses)
@@ -129,12 +137,12 @@ def plot_training_curves(data, output_path, title='Training Curves', show_batch=
                 marker='*', zorder=5, label=f'Best Val ({best_val_loss:.4f})')
 
     ax1.set_xlabel('Epoch', fontsize=12, fontweight='bold')
-    ax1.set_ylabel('Loss', fontsize=12, fontweight='bold')
+    ax1.set_ylabel('Loss (Log Scale)', fontsize=12, fontweight='bold')
     ax1.set_title('Loss Curve', fontsize=14, fontweight='bold')
     ax1.legend(loc='best', frameon=True, shadow=True)
     ax1.grid(True, alpha=0.3, linestyle='--')
     ax1.set_xlim(left=0)
-    ax1.set_ylim(bottom=0)
+    ax1.set_yscale('log') # 保持对数坐标
 
     # 2. 学习率曲线
     ax2 = axes[1] if not show_batch else axes[0, 1]

@@ -10,7 +10,7 @@ conda activate agent
 
 python3 "${PROJECT_ROOT}/inference/infer_chla.py" \
     --data_dir "/data_new/chla_data_imputation_data_260125/chla_data_pretraining/filled_target_modified" \
-    --sst_dir "/data_new/chla_data_imputation_data_260125/chla_data_pretraining/sst_daily_fusion_target" \
+    --sst_dir "/data_new/chla_data_imputation_data_260125/chla_data_pretraining/sst_daily_fusion_target_modified/" \
     --checkpoint "${PROJECT_ROOT}/checkpoints/chla_target_train/best_model.pth" \
     --output_dir "${PROJECT_ROOT}/outputs/chla_inference_2024" \
     --year_start 2024 \

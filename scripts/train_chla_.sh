@@ -9,7 +9,7 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # 配置
 DATA_DIR="/data_new/chla_data_imputation_data_260125/chla_data_pretraining/filled_target_modified"
-SST_DIR="/data_new/chla_data_imputation_data_260125/chla_data_pretraining/sst_daily_fusion_target"
+SST_DIR="/data_new/chla_data_imputation_data_260125/chla_data_pretraining/sst_daily_fusion_target_modified/"
 OUTPUT_DIR="${PROJECT_ROOT}/checkpoints/chla_target_train"
 RESUME_CKPT=""
 NUM_GPUS=8
